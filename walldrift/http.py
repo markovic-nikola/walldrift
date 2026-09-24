@@ -15,7 +15,7 @@ from .errors import HttpError
 
 log = logging.getLogger(__name__)
 
-USER_AGENT = f"walldrift/{__version__}" + (f" (+{HOMEPAGE})" if HOMEPAGE else "")
+USER_AGENT = f"walldrift/{__version__} (+{HOMEPAGE})"
 RETRY_STATUSES = frozenset({429, 500, 502, 503, 504})
 MAX_RETRY_AFTER_S = 60
 """A server asking us to wait longer than this fails the request instead of blocking."""

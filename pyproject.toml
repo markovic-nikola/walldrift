@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "walldrift"
-dynamic = ["version"]
+version = "0.1.0"
 description = "Random wallpaper changer for Linux Mint (Cinnamon) using popular images from online sources"
 readme = "README.md"
 license = "GPL-3.0-or-later"
@@ -19,14 +19,14 @@ classifiers = [
     "Topic :: Desktop Environment",
 ]
 
+[project.urls]
+Homepage = "https://github.com/markovic-nikola/walldrift"
+
 [project.optional-dependencies]
 dev = ["pytest", "ruff", "mypy"]
 
 [project.scripts]
 walldrift = "walldrift.__main__:main"
-
-[tool.hatch.version]
-path = "walldrift/__init__.py"
 
 [tool.ruff]
 line-length = 100
