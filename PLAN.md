@@ -8,7 +8,7 @@ Name: `walldrift`. Applet UUID: `walldrift@markovic-nikola`.
 
 - **Zero setup.** Install from System Settings > Applets > Download and add it to the panel. No terminal, no pipx, no timer to install, no config file to write.
 - Rotate the wallpaper at random on a timer, at login, on unlock, and on demand.
-- Get images from Wallhaven, Unsplash and Pexels, with topics set in the applet's settings.
+- Get popular images from Wallhaven, with topics set in the applet's settings. Add more sources only where the terms allow a wallpaper app (see Sources).
 - Keep a downloaded queue, so changing the wallpaper is instant and still works offline.
 - Favorite an image (keep a copy) or ban it (never show it again).
 - No dependencies beyond what Mint ships: the Python 3 standard library and PyGObject.
@@ -18,12 +18,24 @@ Name: `walldrift`. Applet UUID: `walldrift@markovic-nikola`.
 | Source | "Popular" endpoint | Topic filter | Auth | Limits | Obligations |
 |---|---|---|---|---|---|
 | Wallhaven | `/api/v1/search?sorting=toplist&topRange=1M` (also `views`, `favorites`) | `q=<tag>`, `categories`, `atleast=3840x2160`, `ratios` | none (key only for NSFW) | 45 requests/min | none |
-| Unsplash | `/topics/{slug}/photos?order_by=popular`, or `/photos?order_by=popular` with no topic | topic slug, or `/search/photos?query=` as a fallback | `Client-ID <access key>` (free) | **50 requests/hour** in demo mode | Call `links.download_location` for each download, and credit the photographer. |
-| Pexels | `/v1/curated` with no topic | `/v1/search?query=&orientation=landscape&size=large` | `Authorization: <key>` (free) | 200 requests/hour, 20,000/month | Credit the photographer and Pexels. |
 
-Wallhaven's response format was checked against the live API: search results carry `id`, `url`, `path`, `dimension_x`, `dimension_y`, `purity` and `file_type`, and `meta.last_page`. The Unsplash limit and its `order_by=popular` option come from its documentation. The Pexels limits and endpoints still need to be checked against its documentation.
+Wallhaven's response format was checked against the live API: search results carry `id`, `url`, `path`, `dimension_x`, `dimension_y`, `purity` and `file_type`, and `meta.last_page`. Its API docs set no usage rules beyond the rate limit.
 
-One list request returns 24 to 80 candidates. The candidate lists are cached, so Unsplash's hourly limit is enough.
+**Other sources: checked 2026-09-24, none adopted.** Which second source to add, if any, is still open.
+
+| Source | Verdict |
+|---|---|
+| Unsplash | The API guidelines forbid it: "You cannot replicate the core user experience of Unsplash (unofficial clients, wallpaper applications, etc.)". They also say apps shouldn't make users register as developers. |
+| Pexels | The API guidelines forbid it: "including making Pexels content available as a wallpaper app". |
+| Pixabay | Without special approval, the API gives images at most 1280 px wide, and it needs a key we can't ship in an open-source app. |
+| Wallpaper Abyss (Alpha Coders) | Paid API subscription, with keys activated by hand. |
+| Reddit | Since 2026, every developer needs approval for Data API access, so each user would have to apply. |
+| Desktop Nexus, WallpaperFusion, etc. | No public API. |
+| Bing daily image | Undocumented endpoint with no published terms, and only about a week of images. It could be an optional, off-by-default source at most. |
+| NASA APOD | Its API backend is scheduled to be archived on 2026-12-01. |
+| **Wikimedia Commons Featured pictures** | **The best candidate:** a documented API, free licences that allow this use with author and licence credit, and no key. Its API calls are not verified yet. |
+
+A new source must have terms that allow a wallpaper app, and must need no per-user key or registration, or it breaks the zero-setup goal.
 
 ## Settings
 
@@ -37,9 +49,9 @@ All settings live in the applet's `settings-schema.json`, and Cinnamon renders t
 | | Minimum resolution | combobox: *auto (largest monitor)*, 1920x1080 … 5120x2880 | auto |
 | | Favorites folder | filechooser (folder) | `~/Pictures/Wallpapers` |
 | | Cache limit (MB), images downloaded ahead | spinbuttons | 1024, 3 |
-| Sources | Per source: enabled, weight, topics override (empty = use General) | switch, spinbutton, entry | Wallhaven on, others off until a key is set |
+| Sources | Per source: enabled, weight, topics override (empty = use General) | switch, spinbutton, entry | Wallhaven on |
 | | Wallhaven: sorting, top range, categories (general / anime / people) | comboboxes, switches | toplist, 1M, general |
-| | Unsplash access key, Pexels API key, Wallhaven API key (optional) | entries | empty |
+| | Wallhaven API key (optional) | entry | empty |
 
 Keys are flat (`interval-minutes`, `wallhaven-sorting`, …). The backend maps `<source>-<option>` keys to that source's options, so a new source only adds schema entries and a `Source` subclass.
 
@@ -61,7 +73,7 @@ Cinnamon ──loads at login──► applet.js  (CJS, runs inside Cinnamon: ke
                                ▼
                              backend  (Python, its own process)
                                picker ─► Source.search ─► filter ─► download ─► queue ─► setter (Gio.Settings)
-                               (weighted)  (per site)     (size,     (+ Unsplash         (unique file
+                               (weighted)  (per site)     (size,     (+ source hook      (unique file
                                                            seen,       ping)              per image)
                                                            banned)
 ```
@@ -71,7 +83,7 @@ Cinnamon ──loads at login──► applet.js  (CJS, runs inside Cinnamon: ke
 **Applet responsibilities** (nothing heavy: all network, disk and SQLite work stays in the backend process, so a bug there can never freeze the desktop):
 - **Timer:** a one-minute tick that runs `next` once `interval` has passed since the last change. Using wall-clock time means a laptop that slept through its change time gets one promptly after resume. The tick pauses while the screen is locked.
 - **Login and unlock:** runs `next` on load, and on the screensaver's `ActiveChanged` D-Bus signal, when those switches are on.
-- **Menu:** a credit line for the current image ("Photo by X on Unsplash", or the Wallhaven page), Next, Favorite, Ban and Open page. Open page uses `Gio.AppInfo.launch_default_for_uri`.
+- **Menu:** a credit line for the current image (its page, and the author when the source names one), Next, Favorite, Ban and Open page. Open page uses `Gio.AppInfo.launch_default_for_uri`.
 - **Middle-click** on the icon changes the wallpaper.
 - **Notifications** for errors, without repeating the same one every tick, and once per session for each conflict, with a button that opens the right System Settings page.
 - **One backend call at a time**, until its answer arrives. A request made meanwhile runs right after.
@@ -100,7 +112,7 @@ walldrift@markovic-nikola/            # copied as-is into linuxmint/cinnamon-spi
       config.py                       # validates settings; defaults come from settings-schema.json
       setter.py                       # sets the wallpaper, finds conflicts, reads native monitor modes
       errors.py  http.py  models.py  picker.py  queue.py  store.py
-      sources/  base.py  wallhaven.py  unsplash.py  pexels.py
+      sources/  base.py  wallhaven.py
 tests/                                # backend tests (pytest)
 scripts/dev-install.sh                # symlinks the applet into ~/.local/share/cinnamon/applets and reloads it
 pyproject.toml                        # dev tooling only: ruff, mypy, pytest config and a dev dependency group
@@ -117,7 +129,7 @@ README.md                             # contributor docs; links to the applet RE
 class Source(ABC):
     name: ClassVar[str]                 # its settings are "<name>-*" in settings-schema.json
     def search(self, topic: str | None, page: int) -> SearchPage: ...   # candidates + last_page
-    def on_download(self, c: Candidate) -> None: ...   # no-op except Unsplash
+    def on_download(self, c: Candidate) -> None: ...   # optional hook, e.g. a download ping a source's terms require
 ```
 
 Retries, rate limiting, resolution filtering, deduplication, bans, caching and credits are written once and shared by every source.
@@ -151,8 +163,8 @@ Retries, rate limiting, resolution filtering, deduplication, bans, caching and c
 ## Phases
 
 1. **Backend MVP — done** (`0ca9140`): the Wallhaven source, store, queue, picker, Cinnamon setter and CLI, with tests.
-2. **The applet** (in progress): the backend in the Spices layout, `settings-schema.json` and the stdin JSON protocol, and `applet.js` (timer, login/unlock, menu, middle-click, notifications), plus `scripts/dev-install.sh`. The systemd timer, TOML config and pipx packaging are removed.
-3. **All three sources:** Unsplash and Pexels, with keys in settings, the `download_location` ping and credit lines in the menu.
+2. **The applet — done** (`fbd59e6`): the backend in the Spices layout, `settings-schema.json` and the stdin JSON protocol, and `applet.js` (timer, login/unlock, menu, middle-click, notifications), plus `scripts/dev-install.sh`. The systemd timer, TOML config and pipx packaging are removed.
+3. **More sources: on hold.** Unsplash and Pexels were dropped because their terms forbid wallpaper apps (see Sources). Wikimedia Commons is the leading candidate if we add one.
 4. **Publish:** icon, screenshot, user README, translations (`po/`, via `cinnamon-spices-makepot`), then a PR to `linuxmint/cinnamon-spices-applets`.
 5. **Later:** libsecret for API keys, local folders as a source, perceptual-hash duplicate detection, a `.deb`.
 
@@ -166,7 +178,7 @@ Retries, rate limiting, resolution filtering, deduplication, bans, caching and c
 - **Python version:** if `/usr/bin/python3` is older than 3.11, show a clear notification instead of failing silently.
 - **Conflicts:** the `cinnamon-dynamic-wallpaper` extension and the built-in slideshow overwrite the wallpaper. Warn once per session, saying what to turn off and where, with a button that opens that settings page. Don't turn them off ourselves.
 - **Filenames:** Cinnamon doesn't reload an image saved under the same filename, so every image gets its own file.
-- **Unsplash:** its terms require calling `download_location` for each download; not doing it can get the key revoked.
+- **New sources:** read the API terms before writing code. Unsplash and Pexels both turned out to forbid wallpaper apps.
 - **Favorites:** never delete them when trimming the cache.
 
 ## Decisions
@@ -179,10 +191,8 @@ Retries, rate limiting, resolution filtering, deduplication, bans, caching and c
 ## Open source and licensing
 
 - **Our code:** GPL-3.0-or-later, which matches the Mint and Cinnamon ecosystem.
-- **No API keys in the repo, ever.** Each user registers their own free Unsplash and Pexels keys and enters them in the applet's settings.
+- **No API keys in the repo, ever.** The only key is the optional Wallhaven one, which the user enters in the applet's settings.
 - **No images in the repo or any package.** The applet downloads images only to the user's own cache, for personal use as a desktop background. It never re-hosts or redistributes them.
-- **Unsplash:** call `download_location` for each download, credit the photographer ("Photo by X on Unsplash", with links), don't suggest Unsplash endorses the app, and keep "Unsplash" out of the app name.
-- **Pexels:** credit the photographer and Pexels, with a link back.
 - **Wallhaven:** images belong to their uploaders or artists; keep links back to the source page. Respect the 45 requests/minute limit.
 - **Every request:** send an honest User-Agent (`walldrift/<version> (+repo URL)`) and back off on HTTP 429 responses.
 - **Name:** `walldrift`. It avoids the `mint*` prefix Mint uses for its own tools (mintupdate, mintinstall), so it won't look like an official Mint tool.
