@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
-from typing import Any, ClassVar
+from typing import ClassVar
 
 from ..config import SourceConfig
 from ..errors import ConfigError
@@ -9,20 +9,17 @@ from ..models import Candidate, SearchPage
 
 
 class Source(ABC):
-    """A site that offers wallpapers. Subclasses implement only what differs between sites."""
+    """A site that offers wallpapers. Subclasses implement only what differs between sites.
+
+    A source's own options are its "<name>-<option>" settings in settings-schema.json.
+    """
 
     name: ClassVar[str]
-    OPTIONS: ClassVar[dict[str, Any]] = {}
-    """Source-specific config keys and their defaults."""
 
     def __init__(self, config: SourceConfig, http: HttpClient, min_size: tuple[int, int]) -> None:
-        unknown = config.options.keys() - self.OPTIONS.keys()
-        if unknown:
-            raise ConfigError(f"unknown settings in sources.{self.name}: {', '.join(unknown)}")
         self.config = config
         self.http = http
         self.min_size = min_size
-        self.options = {**self.OPTIONS, **config.options}
 
     @property
     def weight(self) -> float:
@@ -40,15 +37,13 @@ class Source(ABC):
         """Called after each download. Most sources need nothing here."""
 
     def _choice(self, key: str, allowed: Sequence[str]) -> str:
-        value = self.options[key]
+        value = self.config.options[key]
         if value not in allowed:
-            raise ConfigError(f"sources.{self.name}.{key} must be one of: {', '.join(allowed)}")
+            raise ConfigError(f"{self.name}-{key} must be one of: {', '.join(allowed)}")
         return str(value)
 
-    def _choices(self, key: str, allowed: Sequence[str]) -> list[str]:
-        values = self.options[key]
-        if not isinstance(values, list) or not values or not set(values) <= set(allowed):
-            raise ConfigError(
-                f"sources.{self.name}.{key} must be a non-empty list of: {', '.join(allowed)}"
-            )
-        return values
+    def _flag(self, key: str) -> bool:
+        value = self.config.options[key]
+        if not isinstance(value, bool):
+            raise ConfigError(f"{self.name}-{key} must be true or false")
+        return value

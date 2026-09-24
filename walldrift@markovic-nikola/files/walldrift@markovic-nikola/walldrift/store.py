@@ -76,9 +76,10 @@ class Store:
     def add(self, candidate: Candidate, path: Path, size: int) -> None:
         columns = ("key", *_CANDIDATE_COLUMNS, "path", "size", "queued_at")
         values = (candidate.key, *asdict(candidate).values(), str(path), size, self._clock())
+        # Two backend runs may fetch the same image; the first one to finish records it.
+        placeholders = ",".join("?" * len(columns))
         self._db.execute(
-            f"INSERT INTO images ({','.join(columns)}) VALUES ({','.join('?' * len(columns))})",
-            values,
+            f"INSERT OR IGNORE INTO images ({','.join(columns)}) VALUES ({placeholders})", values
         )
 
     def get(self, key: str) -> Image | None:

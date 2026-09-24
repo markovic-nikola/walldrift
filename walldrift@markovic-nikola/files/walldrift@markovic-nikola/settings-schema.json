@@ -1,0 +1,187 @@
+{
+    "layout": {
+        "type": "layout",
+        "pages": ["general-page", "sources-page"],
+        "general-page": {
+            "type": "page",
+            "title": "General",
+            "sections": ["when-section", "which-section", "storage-section"]
+        },
+        "sources-page": {
+            "type": "page",
+            "title": "Sources",
+            "sections": ["wallhaven-section"]
+        },
+        "when-section": {
+            "type": "section",
+            "title": "When to change",
+            "keys": ["interval-minutes", "change-at-login", "change-on-unlock"]
+        },
+        "which-section": {
+            "type": "section",
+            "title": "Which images",
+            "keys": ["topics", "min-resolution"]
+        },
+        "storage-section": {
+            "type": "section",
+            "title": "Storage",
+            "keys": ["favorites-dir", "cache-limit-mb", "queue-size"]
+        },
+        "wallhaven-section": {
+            "type": "section",
+            "title": "Wallhaven",
+            "keys": [
+                "wallhaven-enabled",
+                "wallhaven-weight",
+                "wallhaven-topics",
+                "wallhaven-sorting",
+                "wallhaven-top-range",
+                "wallhaven-general",
+                "wallhaven-anime",
+                "wallhaven-people",
+                "wallhaven-api-key"
+            ]
+        }
+    },
+
+    "interval-minutes": {
+        "type": "spinbutton",
+        "default": 30,
+        "min": 1,
+        "max": 1440,
+        "step": 5,
+        "units": "minutes",
+        "description": "Change the wallpaper every"
+    },
+    "change-at-login": {
+        "type": "switch",
+        "default": true,
+        "description": "Change at login"
+    },
+    "change-on-unlock": {
+        "type": "switch",
+        "default": false,
+        "description": "Change when the screen is unlocked"
+    },
+
+    "topics": {
+        "type": "entry",
+        "default": "",
+        "description": "Topics",
+        "tooltip": "Comma-separated, for example: nature, space, minimal. Leave empty for the most popular images overall."
+    },
+    "min-resolution": {
+        "type": "combobox",
+        "default": "auto",
+        "description": "Minimum resolution",
+        "tooltip": "Skip images smaller than this. \"Largest monitor\" uses your biggest screen's resolution.",
+        "options": {
+            "Largest monitor": "auto",
+            "1920 × 1080": "1920x1080",
+            "2560 × 1440": "2560x1440",
+            "3440 × 1440": "3440x1440",
+            "3840 × 2160": "3840x2160",
+            "5120 × 2880": "5120x2880"
+        }
+    },
+
+    "favorites-dir": {
+        "type": "filechooser",
+        "select-dir": true,
+        "default": "~/Pictures/Wallpapers",
+        "description": "Favorites folder",
+        "tooltip": "Favorite copies the current wallpaper here."
+    },
+    "cache-limit-mb": {
+        "type": "spinbutton",
+        "default": 1024,
+        "min": 100,
+        "max": 20000,
+        "step": 100,
+        "units": "MB",
+        "description": "Cache size limit"
+    },
+    "queue-size": {
+        "type": "spinbutton",
+        "default": 3,
+        "min": 1,
+        "max": 20,
+        "step": 1,
+        "units": "images",
+        "description": "Download ahead",
+        "tooltip": "How many images to keep ready, so changes are instant and work offline."
+    },
+
+    "wallhaven-enabled": {
+        "type": "switch",
+        "default": true,
+        "description": "Use Wallhaven"
+    },
+    "wallhaven-weight": {
+        "type": "spinbutton",
+        "default": 1,
+        "min": 1,
+        "max": 10,
+        "step": 1,
+        "description": "How often, compared with other sources",
+        "dependency": "wallhaven-enabled"
+    },
+    "wallhaven-topics": {
+        "type": "entry",
+        "default": "",
+        "description": "Topics for Wallhaven",
+        "tooltip": "Replaces the General topics for this source. Leave empty to use them.",
+        "dependency": "wallhaven-enabled"
+    },
+    "wallhaven-sorting": {
+        "type": "combobox",
+        "default": "toplist",
+        "description": "Popular by",
+        "options": {
+            "Top rated": "toplist",
+            "Most viewed": "views",
+            "Most favorited": "favorites"
+        },
+        "dependency": "wallhaven-enabled"
+    },
+    "wallhaven-top-range": {
+        "type": "combobox",
+        "default": "1M",
+        "description": "Top rated over the last",
+        "options": {
+            "Day": "1d",
+            "3 days": "3d",
+            "Week": "1w",
+            "Month": "1M",
+            "3 months": "3M",
+            "6 months": "6M",
+            "Year": "1y"
+        },
+        "dependency": "wallhaven-sorting=toplist"
+    },
+    "wallhaven-general": {
+        "type": "switch",
+        "default": true,
+        "description": "General images",
+        "dependency": "wallhaven-enabled"
+    },
+    "wallhaven-anime": {
+        "type": "switch",
+        "default": false,
+        "description": "Anime",
+        "dependency": "wallhaven-enabled"
+    },
+    "wallhaven-people": {
+        "type": "switch",
+        "default": false,
+        "description": "People",
+        "dependency": "wallhaven-enabled"
+    },
+    "wallhaven-api-key": {
+        "type": "entry",
+        "default": "",
+        "description": "API key (optional)",
+        "tooltip": "Not needed for normal use.",
+        "dependency": "wallhaven-enabled"
+    }
+}

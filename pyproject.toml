@@ -1,36 +1,13 @@
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+# Development tooling only. The applet ships as plain files: nothing here is built or installed.
+# Set up: python3 -m venv --system-site-packages .venv && .venv/bin/pip install --group dev
 
-[project]
-name = "walldrift"
-version = "0.1.0"
-description = "Random wallpaper changer for Linux Mint (Cinnamon) using popular images from online sources"
-readme = "README.md"
-license = "GPL-3.0-or-later"
-requires-python = ">=3.11"
-# Runtime needs only the standard library plus the system's PyGObject (python3-gi),
-# which is not installed from PyPI. See README for installing with pipx.
-dependencies = []
-classifiers = [
-    "Environment :: X11 Applications :: GTK",
-    "Operating System :: POSIX :: Linux",
-    "Programming Language :: Python :: 3",
-    "Topic :: Desktop Environment",
-]
-
-[project.urls]
-Homepage = "https://github.com/markovic-nikola/walldrift"
-
-[project.optional-dependencies]
+[dependency-groups]
 dev = ["pytest", "ruff", "mypy"]
-
-[project.scripts]
-walldrift = "walldrift.__main__:main"
 
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+src = ["walldrift@markovic-nikola/files/walldrift@markovic-nikola", "."]
 extend-exclude = ["*.md"]
 
 [tool.ruff.lint]
@@ -39,6 +16,8 @@ select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
 [tool.mypy]
 strict = true
 python_version = "3.11"
+mypy_path = "walldrift@markovic-nikola/files/walldrift@markovic-nikola"
+files = ["walldrift@markovic-nikola/files/walldrift@markovic-nikola/walldrift", "tests"]
 
 [[tool.mypy.overrides]]
 module = ["gi", "gi.*"]
@@ -46,3 +25,4 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["walldrift@markovic-nikola/files/walldrift@markovic-nikola"]

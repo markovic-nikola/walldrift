@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 
 import pytest
@@ -6,87 +5,99 @@ import pytest
 from walldrift import config
 from walldrift.errors import ConfigError
 
+from .conftest import SCREEN, make_config
 
-def test_defaults() -> None:
-    c = config.parse({}, {})
-    assert c.interval_s == 1800
-    assert (c.min_width, c.min_height) == (1920, 1080)
-    assert [s.name for s in c.sources] == ["wallhaven"]
-    assert c.sources[0].enabled
+
+def test_defaults_come_from_the_schema() -> None:
+    c = make_config()
+    assert (c.min_width, c.min_height) == SCREEN  # "auto"
+    assert c.queue_size == 3
+    assert c.cache_limit_bytes == 1024 * 2**20
     assert c.favorites_dir == Path.home() / "Pictures/Wallpapers"
+    [wallhaven] = c.sources
+    assert (wallhaven.name, wallhaven.enabled, wallhaven.weight) == ("wallhaven", True, 1.0)
+    assert wallhaven.topics == ()
+    assert wallhaven.api_key is None
+    assert wallhaven.options == {
+        "sorting": "toplist",
+        "top-range": "1M",
+        "general": True,
+        "anime": False,
+        "people": False,
+    }
+
+
+def test_load_without_settings_uses_defaults() -> None:
+    assert config.load(None, lambda: SCREEN) == make_config()
+    assert config.load("  ", lambda: SCREEN) == make_config()
+
+
+def test_load_merges_given_settings() -> None:
+    c = config.load('{"queue-size": 7, "topics": "space"}', lambda: SCREEN)
+    assert c.queue_size == 7
+    assert c.sources[0].topics == ("space",)
+
+
+def test_explicit_resolution_skips_screen_detection() -> None:
+    def no_screen() -> tuple[int, int]:
+        raise AssertionError("should not be called")
+
+    c = config.parse({**config.defaults(), "min-resolution": "3840x2160"}, no_screen)
+    assert (c.min_width, c.min_height) == (3840, 2160)
+
+
+def test_topics_are_comma_separated_and_sources_can_override() -> None:
+    c = make_config({"topics": " nature, space ,, minimal ", "wallhaven-topics": ""})
+    assert c.sources[0].topics == ("nature", "space", "minimal")
+    c = make_config({"topics": "nature", "wallhaven-topics": "cyberpunk"})
+    assert c.sources[0].topics == ("cyberpunk",)
+
+
+def test_api_key_is_trimmed() -> None:
+    assert make_config({"wallhaven-api-key": "  k  "}).sources[0].api_key == "k"
+
+
+def test_spinbutton_floats_are_accepted() -> None:
+    assert make_config({"queue-size": 4.0}).queue_size == 4
 
 
 @pytest.mark.parametrize(
-    ("text", "seconds"), [("30m", 1800), ("1h30m", 5400), ("90s", 90), ("1d", 86400)]
-)
-def test_parse_duration(text: str, seconds: int) -> None:
-    assert config.parse_duration(text) == seconds
-
-
-@pytest.mark.parametrize("text", ["30", "m", "30x", "10s", "1h 30", 30])
-def test_parse_duration_rejects(text: object) -> None:
-    with pytest.raises(ConfigError):
-        config.parse_duration(text)
-
-
-def test_per_source_topics_override_global() -> None:
-    c = config.parse(
-        {
-            "topics": ["nature"],
-            "sources": {"wallhaven": {"topics": ["cyberpunk"], "weight": 2}, "other": {}},
-        },
-        {"wallhaven": {"api_key": "k"}},
-    )
-    wallhaven, other = c.sources
-    assert wallhaven.topics == ("cyberpunk",)
-    assert wallhaven.weight == 2
-    assert wallhaven.api_key == "k"
-    assert wallhaven.options == {}
-    assert other.topics == ("nature",)
-
-
-def test_source_specific_options_are_passed_through() -> None:
-    c = config.parse({"sources": {"wallhaven": {"sorting": "views"}}}, {})
-    assert c.sources[0].options == {"sorting": "views"}
-
-
-@pytest.mark.parametrize(
-    "raw",
+    ("value", "expected"),
     [
-        {"unknown": 1},
-        {"min_resolution": "big"},
-        {"queue_size": 0},
-        {"cache_limit_mb": True},
-        {"topics": "nature"},
-        {"sources": {"wallhaven": {"weight": 0}}},
-        {"sources": {"wallhaven": {"enabled": "yes"}}},
+        ("/data/walls", Path("/data/walls")),
+        ("file:///data/my%20walls", Path("/data/my walls")),
+        ("~/Walls", Path.home() / "Walls"),
     ],
 )
-def test_invalid_config(raw: dict[str, object]) -> None:
+def test_favorites_dir_forms(value: str, expected: Path) -> None:
+    assert make_config({"favorites-dir": value}).favorites_dir == expected
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"min-resolution": "big"},
+        {"queue-size": 0},
+        {"queue-size": 2.5},
+        {"cache-limit-mb": True},
+        {"topics": ["nature"]},
+        {"favorites-dir": "relative/path"},
+        {"wallhaven-weight": 0},
+        {"wallhaven-enabled": "yes"},
+    ],
+)
+def test_invalid_settings(overrides: dict[str, object]) -> None:
     with pytest.raises(ConfigError):
-        config.parse(raw, {})
+        make_config(overrides)
 
 
-def test_load_reads_files_and_warns_on_open_secrets(
-    tmp_path: Path, caplog: pytest.LogCaptureFixture
-) -> None:
-    cfg = tmp_path / "config.toml"
-    cfg.write_text('interval = "1h"\n')
-    secrets = tmp_path / "secrets.toml"
-    secrets.write_text('[wallhaven]\napi_key = "k"\n')
-    os.chmod(secrets, 0o644)
-    c = config.load(cfg, secrets)
-    assert c.interval_s == 3600
-    assert c.sources[0].api_key == "k"
-    assert "readable by other users" in caplog.text
+def test_source_missing_a_shared_setting() -> None:
+    values = config.defaults()
+    del values["wallhaven-weight"]
+    with pytest.raises(ConfigError, match="wallhaven-weight"):
+        config.parse(values, lambda: SCREEN)
 
 
-def test_load_missing_files_uses_defaults(tmp_path: Path) -> None:
-    assert config.load(tmp_path / "none.toml", tmp_path / "none2.toml") == config.parse({}, {})
-
-
-def test_bad_toml(tmp_path: Path) -> None:
-    cfg = tmp_path / "config.toml"
-    cfg.write_text("interval = ")
-    with pytest.raises(ConfigError, match=r"config\.toml"):
-        config.load(cfg, tmp_path / "secrets.toml")
+def test_bad_json() -> None:
+    with pytest.raises(ConfigError, match="not valid JSON"):
+        config.load("{", lambda: SCREEN)

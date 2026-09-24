@@ -18,15 +18,15 @@ BODY = {"data": [ITEM, {**ITEM, "id": "nsfw", "purity": "nsfw"}], "meta": {"last
 
 
 def wallhaven(http: FakeHttp, **options: object) -> Wallhaven:
-    config = make_config(sources={"wallhaven": options}, min_resolution="3840x2160")
-    [source] = sources.build(config, http)
+    settings = {f"wallhaven-{key}": value for key, value in options.items()}
+    [source] = sources.build(make_config({**settings, "min-resolution": "3840x2160"}), http)
     assert isinstance(source, Wallhaven)
     return source
 
 
 def test_search_builds_query_and_parses_results() -> None:
     http = FakeHttp([BODY])
-    page = wallhaven(http, categories=["general", "people"]).search("nature", 2)
+    page = wallhaven(http, people=True).search("nature", 2)
 
     url, params, headers = http.requests[0]
     assert url == "https://wallhaven.cc/api/v1/search"
@@ -46,22 +46,22 @@ def test_search_builds_query_and_parses_results() -> None:
     assert c.image_url == ITEM["path"]
 
 
-def test_no_topic_and_non_toplist_sorting() -> None:
+def test_no_topic_non_toplist_sorting_and_api_key() -> None:
     http = FakeHttp([BODY])
-    wallhaven(http, sorting="views").search(None, 1)
-    params = http.requests[0][1]
+    wallhaven(http, sorting="views", **{"api-key": "k"}).search(None, 1)
+    _, params, headers = http.requests[0]
     assert "q" not in params
     assert "topRange" not in params
+    assert headers == {"X-API-Key": "k"}
 
 
 @pytest.mark.parametrize(
     "options",
     [
         {"sorting": "new"},
-        {"top_range": "2w"},
-        {"categories": []},
-        {"categories": ["cats"]},
-        {"x": 1},
+        {"top-range": "2w"},
+        {"general": False},
+        {"anime": "yes"},
     ],
 )
 def test_invalid_options(options: dict[str, object]) -> None:
@@ -69,7 +69,6 @@ def test_invalid_options(options: dict[str, object]) -> None:
         wallhaven(FakeHttp(), **options)
 
 
-def test_build_skips_unknown_and_disabled_sources() -> None:
-    config = make_config(sources={"wallhaven": {"enabled": False}, "nope": {}})
+def test_build_needs_an_enabled_source() -> None:
     with pytest.raises(ConfigError, match="no sources are enabled"):
-        sources.build(config, FakeHttp())
+        sources.build(make_config({"wallhaven-enabled": False}), FakeHttp())

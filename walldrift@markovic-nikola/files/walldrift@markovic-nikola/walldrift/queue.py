@@ -1,6 +1,7 @@
 """Keeps images downloaded ahead of time and trims the cache."""
 
 import logging
+import os
 import random
 import re
 from collections.abc import Sequence
@@ -87,12 +88,13 @@ class Queue:
         self._images_dir.mkdir(parents=True, exist_ok=True)
         # One file per image, so Cinnamon always sees a new path and reloads it.
         stem = re.sub(r"[^A-Za-z0-9_-]", "_", f"{candidate.source}-{candidate.id}")
-        part = self._images_dir / f"{stem}.part"
+        # Another backend run may be fetching the same image; each writes its own part file.
+        part = self._images_dir / f"{stem}.{os.getpid()}.part"
         try:
             content_type = self._http.download(candidate.image_url, part)
             extension = EXTENSIONS.get(content_type)
             if extension is None:
                 raise HttpError(f"{candidate.image_url} is {content_type}, not a supported image")
-            return part.replace(part.with_suffix(extension))
+            return part.replace(self._images_dir / f"{stem}{extension}")
         finally:
             part.unlink(missing_ok=True)

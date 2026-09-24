@@ -16,17 +16,19 @@ def make_queue(
     tmp_path: Path,
     pages: list[list[Candidate]],
     http: FakeHttp | None = None,
-    **config: object,
+    settings: dict[str, object] | None = None,
 ) -> tuple[Queue, FakeSource]:
     source = FakeSource(pages)
     queue = Queue(
-        make_config(**config), store, http or FakeHttp(), [source], tmp_path, random.Random(1)
+        make_config(settings), store, http or FakeHttp(), [source], tmp_path, random.Random(1)
     )
     return queue, source
 
 
 def test_refill_downloads_until_full(store: Store, tmp_path: Path) -> None:
-    queue, source = make_queue(store, tmp_path, [[candidate(n) for n in range(5)]], queue_size=3)
+    queue, source = make_queue(
+        store, tmp_path, [[candidate(n) for n in range(5)]], settings={"queue-size": 3}
+    )
     assert queue.refill() == 3
     assert store.queued_count() == 3
     assert len(source.downloaded) == 3
@@ -36,7 +38,7 @@ def test_refill_downloads_until_full(store: Store, tmp_path: Path) -> None:
 
 def test_small_and_known_images_are_skipped(store: Store, tmp_path: Path) -> None:
     pages = [[candidate(1, width=800, height=600), candidate(2), candidate(3)]]
-    queue, _ = make_queue(store, tmp_path, pages, queue_size=5)
+    queue, _ = make_queue(store, tmp_path, pages, settings={"queue-size": 5})
     assert queue.refill() == 2
     assert store.known_keys(["fake:id1"]) == set()
 
@@ -76,7 +78,7 @@ def test_evict_removes_oldest_shown_files(store: Store, tmp_path: Path) -> None:
         path.write_bytes(b"x")
         store.add(candidate(n), path, mb)
         store.mark_shown(f"fake:id{n}")
-    queue, _ = make_queue(store, tmp_path, [], cache_limit_mb=2)
+    queue, _ = make_queue(store, tmp_path, [], settings={"cache-limit-mb": 2})
     assert queue.evict() == 1
     assert not (tmp_path / "1.jpg").exists()
     assert (tmp_path / "3.jpg").exists()

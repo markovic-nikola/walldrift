@@ -84,5 +84,9 @@ def store(clock: Clock) -> Store:
     return Store(":memory:", clock=clock)
 
 
-def make_config(**overrides: Any) -> config.Config:
-    return config.parse(overrides, {})
+SCREEN = (2560, 1440)
+
+
+def make_config(overrides: dict[str, Any] | None = None) -> config.Config:
+    """The schema's defaults with some settings changed; "auto" resolution means SCREEN."""
+    return config.parse({**config.defaults(), **(overrides or {})}, lambda: SCREEN)
