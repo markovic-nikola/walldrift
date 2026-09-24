@@ -1,0 +1,48 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "walldrift"
+dynamic = ["version"]
+description = "Random wallpaper changer for Linux Mint (Cinnamon) using popular images from online sources"
+readme = "README.md"
+license = "GPL-3.0-or-later"
+requires-python = ">=3.11"
+# Runtime needs only the standard library plus the system's PyGObject (python3-gi),
+# which is not installed from PyPI. See README for installing with pipx.
+dependencies = []
+classifiers = [
+    "Environment :: X11 Applications :: GTK",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Topic :: Desktop Environment",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "ruff", "mypy"]
+
+[project.scripts]
+walldrift = "walldrift.__main__:main"
+
+[tool.hatch.version]
+path = "walldrift/__init__.py"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["*.md"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.mypy]
+strict = true
+python_version = "3.11"
+
+[[tool.mypy.overrides]]
+module = ["gi", "gi.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
