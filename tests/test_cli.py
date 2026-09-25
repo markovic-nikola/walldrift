@@ -15,7 +15,7 @@ from .conftest import FakeHttp, FakeSource, candidate
 @pytest.fixture
 def backend(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> list[Path]:
     """A backend with temporary XDG dirs, a fake source and a recorded wallpaper setter."""
-    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
     monkeypatch.setattr(protocol, "_sent", False)
     monkeypatch.setattr(

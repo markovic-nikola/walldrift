@@ -9,10 +9,9 @@ from pathlib import Path
 from typing import Any, TypeVar
 from urllib.parse import unquote, urlsplit
 
-from . import APPLET_DIR
+from . import APPLET_DIR, UUID
 from .errors import ConfigError
 
-APP = "walldrift"
 SCHEMA_PATH = APPLET_DIR / "settings-schema.json"
 
 # Every source has "<name>-enabled", "-weight", "-topics" and "-api-key" settings.
@@ -44,12 +43,13 @@ class Config:
 
 
 def _xdg(var: str, fallback: str) -> Path:
-    return Path(os.environ.get(var) or Path.home() / fallback) / APP
+    # Named after the applet's UUID, as Spices asks; never inside the applet folder itself.
+    return Path(os.environ.get(var) or Path.home() / fallback) / UUID
 
 
-def data_dir() -> Path:
-    """Durable state: the database with favorites and bans."""
-    return _xdg("XDG_DATA_HOME", ".local/share")
+def state_dir() -> Path:
+    """Durable state: the database with history, favorites and bans, and the locks."""
+    return _xdg("XDG_STATE_HOME", ".local/state")
 
 
 def cache_dir() -> Path:

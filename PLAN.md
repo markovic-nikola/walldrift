@@ -68,7 +68,7 @@ Cinnamon ──loads at login──► applet.js  (CJS, runs inside Cinnamon: ke
                                │  AppletSettings, one-minute tick, lock/unlock signal,
                                │  panel menu, middle-click, notifications
                                │
-                               │  Gio.Subprocess: /usr/bin/python3 -m walldrift <command>
+                               │  Gio.Subprocess: /usr/bin/python3 -B -m walldrift <command>
                                │  stdin: settings as JSON        stdout: result as JSON (first line)
                                ▼
                              backend  (Python, its own process)
@@ -83,7 +83,7 @@ Cinnamon ──loads at login──► applet.js  (CJS, runs inside Cinnamon: ke
 **Applet responsibilities** (nothing heavy: all network, disk and SQLite work stays in the backend process, so a bug there can never freeze the desktop):
 - **Timer:** a one-minute tick that runs `next` once `interval` has passed since the last change. Using wall-clock time means a laptop that slept through its change time gets one promptly after resume. The tick pauses while the screen is locked.
 - **Login and unlock:** runs `next` on load, and on the screensaver's `ActiveChanged` D-Bus signal, when those switches are on.
-- **Menu:** a credit line for the current image (its page, and the author when the source names one), Next, Favorite, Ban and Open page. Open page uses `Gio.AppInfo.launch_default_for_uri`.
+- **Menu:** a credit line for the current image (its page, and the author when the source names one), Next, Favorite, Ban and Open page. Open page uses `Gio.AppInfo.launch_default_for_uri_async`.
 - **Middle-click** on the icon changes the wallpaper.
 - **Notifications** for errors, without repeating the same one every tick, and once per session for each conflict, with a button that opens the right System Settings page.
 - **One backend call at a time**, until its answer arrives. A request made meanwhile runs right after.
@@ -120,7 +120,7 @@ README.md                             # contributor docs; links to the applet RE
 ```
 
 - **Version and homepage** live only in `metadata.json`. The backend reads them from the file next to its package, for the User-Agent. This replaces reading them from installed package metadata, since nothing is pip-installed any more.
-- **Files:** the database stays in `~/.local/share/walldrift/` (favorites and bans are durable), downloaded images in `~/.cache/walldrift/images/`.
+- **Files:** the database and locks live in `~/.local/state/walldrift@markovic-nikola/` (history, favorites and bans are durable), downloaded images in `~/.cache/walldrift@markovic-nikola/images/`. They are named after the UUID, and nothing is ever written inside the applet folder: the backend runs as `python3 -B` so it can't leave `__pycache__` there.
 - **Dev loop:** `scripts/dev-install.sh` symlinks the applet into place and reloads it with `org.Cinnamon.ReloadXlet(uuid, "APPLET")` over D-Bus. Run it again after each change. Logs show up in Looking Glass (`lg`) and `~/.xsession-errors`.
 
 **Source interface.** Each source implements only what differs between sites:
@@ -174,7 +174,8 @@ Retries, rate limiting, resolution filtering, deduplication, bans, caching and c
   - Settings go only through Cinnamon's xlet settings: no GSettings schemas of our own, and no editing Cinnamon's JSON files. The backend never touches that file; it gets values on stdin.
   - No compiled code, and no downloading or running code from outside Spices.
   - System dependencies must be installable through apt. We need only `python3` and `python3-gi`, which Mint always ships.
-- **Never block Cinnamon:** all file and process I/O in `applet.js` is async, and the backend runs in its own process.
+- **Never block Cinnamon:** all file and process I/O in `applet.js` is async, including reading `settings-schema.json` and opening pages, and the backend runs in its own process.
+- **Spices review checklist:** before each submission, check the code against the review agent's instructions (`.github/copilot-instructions.md` in the Spices repo). The README recommends this for AI-assisted code; AI use is allowed and needn't be disclosed.
 - **Python version:** if `/usr/bin/python3` is older than 3.11, show a clear notification instead of failing silently.
 - **Conflicts:** the `cinnamon-dynamic-wallpaper` extension and the built-in slideshow overwrite the wallpaper. Warn once per session, saying what to turn off and where, with a button that opens that settings page. Don't turn them off ourselves.
 - **Filenames:** Cinnamon doesn't reload an image saved under the same filename, so every image gets its own file.

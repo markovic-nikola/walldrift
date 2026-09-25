@@ -10,3 +10,4 @@ APPLET_DIR = Path(__file__).resolve().parent.parent
 _metadata = json.loads((APPLET_DIR / "metadata.json").read_text())
 __version__: str = _metadata["version"]
 HOMEPAGE: str = _metadata["url"]
+UUID: str = _metadata["uuid"]

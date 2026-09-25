@@ -31,14 +31,14 @@ class WalldriftApplet extends Applet.IconApplet {
         this._dir = metadata.path;
         this._image = null; // the current wallpaper, from the backend's last answer
         this._busy = false; // a backend command is waiting for its answer
-        this._pending = null; // a command asked for while busy; runs next
+        this._pending = null; // a command asked for while busy or still starting up; runs next
         this._lastAttempt = 0; // when "next" last ran (ms), so a failing change waits a full interval
         this._lastError = null; // don't repeat the same error notification every tick
         this._shownConflicts = new Set(); // warn about each conflict once per session
 
         this.set_applet_icon_symbolic_name(ICON + "-symbolic");
         this._settings = new Settings.AppletSettings(this, UUID, instanceId);
-        this._settingKeys = this._readSettingKeys();
+        this._settingKeys = null; // loaded from settings-schema.json; commands wait for it
         this._buildMenu(orientation);
 
         this._screenSaver = new ScreenSaver.ScreenSaverProxy();
@@ -51,7 +51,7 @@ class WalldriftApplet extends Applet.IconApplet {
             return GLib.SOURCE_CONTINUE;
         });
 
-        this._run(this._settings.getValue("change-at-login") ? "next" : "info");
+        this._loadSettingKeys(this._settings.getValue("change-at-login") ? "next" : "info");
     }
 
     // Panel events
@@ -65,8 +65,14 @@ class WalldriftApplet extends Applet.IconApplet {
     }
 
     on_applet_removed_from_panel() {
-        GLib.source_remove(this._tick);
-        this._screenSaver.disconnectSignal(this._screenSaverSignal);
+        if (this._tick) {
+            GLib.source_remove(this._tick);
+            this._tick = 0;
+        }
+        if (this._screenSaverSignal) {
+            this._screenSaver.disconnectSignal(this._screenSaverSignal);
+            this._screenSaverSignal = 0;
+        }
         this._settings.finalize();
     }
 
@@ -104,11 +110,14 @@ class WalldriftApplet extends Applet.IconApplet {
 
     _openPage() {
         if (!this._image) return;
-        try {
-            Gio.AppInfo.launch_default_for_uri(this._image.page_url, null);
-        } catch (e) {
-            this._notify(_("Could not open %s: %s").format(this._image.page_url, e.message));
-        }
+        const url = this._image.page_url;
+        Gio.AppInfo.launch_default_for_uri_async(url, null, null, (source, result) => {
+            try {
+                Gio.AppInfo.launch_default_for_uri_finish(result);
+            } catch (e) {
+                this._notify(_("Could not open %s: %s").format(url, e.message));
+            }
+        });
     }
 
     // Timing
@@ -130,11 +139,20 @@ class WalldriftApplet extends Applet.IconApplet {
 
     // Backend
 
-    _readSettingKeys() {
-        // Read once at startup; a small local file, so reading it synchronously is fine.
-        const [, bytes] = GLib.file_get_contents(this._dir + "/settings-schema.json");
-        const schema = JSON.parse(new TextDecoder().decode(bytes));
-        return Object.keys(schema).filter(key => "default" in schema[key]);
+    // The keys of every setting, which the backend receives with their values.
+    _loadSettingKeys(firstCommand) {
+        const file = Gio.File.new_for_path(this._dir + "/settings-schema.json");
+        file.load_contents_async(null, (f, result) => {
+            try {
+                const [, bytes] = f.load_contents_finish(result);
+                const schema = JSON.parse(new TextDecoder().decode(bytes));
+                this._settingKeys = Object.keys(schema).filter(key => "default" in schema[key]);
+            } catch (e) {
+                this._notify(_("Could not read the applet's settings: %s").format(e.message));
+                return;
+            }
+            this._run(firstCommand);
+        });
     }
 
     _settingsJson() {
@@ -142,7 +160,7 @@ class WalldriftApplet extends Applet.IconApplet {
     }
 
     _run(command) {
-        if (this._busy) {
+        if (this._busy || !this._settingKeys) {
             this._pending = command;
             return;
         }
@@ -156,7 +174,8 @@ class WalldriftApplet extends Applet.IconApplet {
                 flags: Gio.SubprocessFlags.STDIN_PIPE | Gio.SubprocessFlags.STDOUT_PIPE,
             });
             launcher.set_cwd(this._dir);
-            proc = launcher.spawnv([PYTHON, "-m", "walldrift", command]);
+            // -B: never write __pycache__ into the applet folder.
+            proc = launcher.spawnv([PYTHON, "-B", "-m", "walldrift", command]);
         } catch (e) {
             this._onAnswer({ error: _("Could not start %s: %s").format(PYTHON, e.message) });
             return;

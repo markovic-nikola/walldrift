@@ -39,7 +39,7 @@ class App:
 
     @cached_property
     def store(self) -> Store:
-        return Store(config.data_dir() / "walldrift.db")
+        return Store(config.state_dir() / "walldrift.db")
 
     @cached_property
     def queue(self) -> Queue:
@@ -64,7 +64,7 @@ class App:
 
         They are separate so a change is never stuck behind another run's downloads.
         """
-        path = config.data_dir() / f"{name}.lock"
+        path = config.state_dir() / f"{name}.lock"
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("w") as f:
             try:
