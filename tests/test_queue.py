@@ -1,11 +1,13 @@
+import os
 import random
+import time
 from pathlib import Path
 
 import pytest
 
 from walldrift.errors import HttpError
 from walldrift.models import Candidate
-from walldrift.queue import Queue
+from walldrift.queue import ORPHAN_AGE, Queue
 from walldrift.store import Store
 
 from .conftest import FakeHttp, FakeSource, candidate, make_config
@@ -85,6 +87,18 @@ def test_evict_removes_oldest_shown_files(store: Store, tmp_path: Path) -> None:
     assert not (tmp_path / "1.jpg").exists()
     assert (tmp_path / "3.jpg").exists()
     assert store.cache_bytes() == 2 * mb
+
+
+def test_evict_removes_old_files_the_database_does_not_use(store: Store, tmp_path: Path) -> None:
+    old = time.time() - ORPHAN_AGE - 1
+    for name in ("known.jpg", "orphan.jpg", "fake-id9.123.part", "fresh.jpg"):
+        (tmp_path / name).write_bytes(b"x")
+        if name != "fresh.jpg":  # may belong to a run that hasn't recorded it yet
+            os.utime(tmp_path / name, (old, old))
+    store.add(candidate(1), tmp_path / "known.jpg", 1)
+    queue, _ = make_queue(store, tmp_path, [])
+    assert queue.evict() == 2
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["fresh.jpg", "known.jpg"]
 
 
 def test_pop_drops_queued_images_that_no_longer_fit(store: Store, tmp_path: Path) -> None:

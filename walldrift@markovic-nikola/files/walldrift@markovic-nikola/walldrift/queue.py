@@ -1,9 +1,11 @@
 """Keeps images downloaded ahead of time and trims the cache."""
 
+import contextlib
 import logging
 import os
 import random
 import re
+import time
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -18,6 +20,10 @@ from .store import Store
 log = logging.getLogger(__name__)
 
 EXTENSIONS = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}
+
+# Stray files younger than this are left alone: another run may still be downloading them,
+# or have finished and not yet recorded them.
+ORPHAN_AGE = 60 * 60  # seconds
 
 
 class Queue:
@@ -89,9 +95,9 @@ class Queue:
         return True
 
     def evict(self) -> int:
-        """Deletes the least recently shown files until the cache fits its limit."""
+        """Deletes stray files, then least recently shown ones until the cache fits its limit."""
+        removed = self._remove_orphans()
         total = self._store.cache_bytes()
-        removed = 0
         for image in self._store.evictable():
             if total <= self._config.cache_limit_bytes:
                 break
@@ -100,6 +106,21 @@ class Queue:
             self._store.forget_file(image.key)
             total -= image.size
             removed += 1
+        return removed
+
+    def _remove_orphans(self) -> int:
+        """Deletes files no image in the database uses, e.g. left behind by a killed run."""
+        if not self._images_dir.is_dir():
+            return 0
+        known = self._store.cached_paths()
+        cutoff = time.time() - ORPHAN_AGE
+        removed = 0
+        for path in self._images_dir.iterdir():
+            with contextlib.suppress(FileNotFoundError):  # another run may remove it first
+                if path not in known and path.is_file() and path.stat().st_mtime < cutoff:
+                    path.unlink()
+                    log.info("removed %s: no image in the database uses it", path.name)
+                    removed += 1
         return removed
 
     def _download(self, candidate: Candidate) -> Path:

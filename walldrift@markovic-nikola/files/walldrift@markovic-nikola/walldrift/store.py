@@ -118,6 +118,11 @@ class Store:
         ).fetchone()[0]
         return total
 
+    def cached_paths(self) -> set[Path]:
+        """Every file the database still counts as in the cache."""
+        rows = self._db.execute("SELECT path FROM images WHERE path IS NOT NULL")
+        return {Path(row["path"]) for row in rows}
+
     def mark_shown(self, key: str) -> None:
         self._update(key, shown_at=self._clock())
 
