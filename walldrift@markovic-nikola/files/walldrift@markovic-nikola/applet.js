@@ -118,7 +118,10 @@ class WalldriftApplet extends Applet.IconApplet {
         const shownAt = this._image && this._image.shown_at ? this._image.shown_at * 1000 : 0;
         const intervalMs = this._settings.getValue("interval-minutes") * 60 * 1000;
         // Wall-clock time, so a laptop that slept past its change time changes soon after waking.
-        if (Date.now() - Math.max(shownAt, this._lastAttempt) >= intervalMs) this._run("next");
+        // Up to half a tick early counts as due: the change time is recorded just after a tick,
+        // so waiting for the full interval would always slip to the following tick.
+        const elapsedMs = Date.now() - Math.max(shownAt, this._lastAttempt);
+        if (elapsedMs >= intervalMs - (TICK_SECONDS * 1000) / 2) this._run("next");
     }
 
     _onScreenSaverChanged(active) {

@@ -50,6 +50,8 @@ def test_pop_fetches_when_queue_is_empty(store: Store, tmp_path: Path) -> None:
 
 
 def test_pop_falls_back_to_a_shown_image_when_offline(store: Store, tmp_path: Path) -> None:
+    store.add(candidate(0, width=2160, height=3840), tmp_path / "tall.jpg", 10)  # never reshown
+    store.mark_shown("fake:id0")
     for n in (1, 2):
         store.add(candidate(n), tmp_path / f"{n}.jpg", 10)
         store.mark_shown(f"fake:id{n}")
@@ -83,3 +85,15 @@ def test_evict_removes_oldest_shown_files(store: Store, tmp_path: Path) -> None:
     assert not (tmp_path / "1.jpg").exists()
     assert (tmp_path / "3.jpg").exists()
     assert store.cache_bytes() == 2 * mb
+
+
+def test_pop_drops_queued_images_that_no_longer_fit(store: Store, tmp_path: Path) -> None:
+    portrait = tmp_path / "tall.jpg"
+    portrait.write_bytes(b"x")
+    store.add(candidate(1, width=2160, height=3840), portrait, 1)
+    store.add(candidate(2), tmp_path / "2.jpg", 1)
+    queue, _ = make_queue(store, tmp_path, [])
+    image = queue.pop()
+    assert image is not None and image.key == "fake:id2"
+    assert not portrait.exists()
+    assert store.known_keys(["fake:id1"]) == set()  # forgotten, not banned

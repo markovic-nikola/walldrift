@@ -36,6 +36,7 @@ def test_search_builds_query_and_parses_results() -> None:
         "categories": "101",
         "purity": "100",
         "atleast": "3840x2160",
+        "ratios": "landscape",
         "page": "2",
         "q": "nature",
     }

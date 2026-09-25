@@ -39,17 +39,35 @@ class Queue:
 
     def pop(self) -> Image | None:
         """The next image to show: queued if possible, else fetched now, else an old one."""
-        image = self._store.next_queued()
+        image = self._next_fitting()
         if image is None:
             try:
                 if self.fetch_one():
-                    image = self._store.next_queued()
+                    image = self._next_fitting()
             except HttpError as e:
                 log.warning("could not fetch a new image: %s", e)
         if image is None:
             current = self._store.current()
-            image = self._store.random_shown(exclude=current.key if current else None)
+            shown = self._store.shown_in_random_order(exclude=current.key if current else None)
+            image = next((i for i in shown if self._fits(i)), None)
         return image
+
+    def _fits(self, image: Image) -> bool:
+        return image.candidate.fits(self._config.min_width, self._config.min_height)
+
+    def _next_fitting(self) -> Image | None:
+        """The oldest queued image that suits the current settings, dropping any that don't.
+
+        Images queued before a setting changed (e.g. a higher minimum resolution) may not.
+        """
+        while (image := self._store.next_queued()) is not None:
+            if self._fits(image):
+                return image
+            log.info("dropping %s: it no longer fits the screen settings", image.key)
+            if image.path:
+                image.path.unlink(missing_ok=True)
+            self._store.forget(image.key)
+        return None
 
     def refill(self) -> int:
         """Downloads until queue_size images are waiting; returns how many were added."""

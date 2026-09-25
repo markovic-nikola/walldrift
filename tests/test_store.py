@@ -46,12 +46,11 @@ def test_evictable_excludes_current_and_queued(store: Store) -> None:
     assert store.cache_bytes() == 40
 
 
-def test_random_shown_skips_excluded(store: Store) -> None:
+def test_shown_in_random_order_skips_excluded(store: Store) -> None:
     store.add(candidate(1), Path("/c/1.jpg"), 10)
     store.mark_shown("fake:id1")
-    assert store.random_shown(exclude="fake:id1") is None
-    image = store.random_shown(exclude=None)
-    assert image is not None and image.key == "fake:id1"
+    assert store.shown_in_random_order(exclude="fake:id1") == []
+    assert [i.key for i in store.shown_in_random_order(exclude=None)] == ["fake:id1"]
 
 
 def test_candidate_cache_expires(store: Store, clock: Clock) -> None:

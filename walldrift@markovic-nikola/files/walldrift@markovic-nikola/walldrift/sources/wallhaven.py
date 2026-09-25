@@ -35,6 +35,7 @@ class Wallhaven(Source):
             "categories": self._category_bits,
             "purity": SFW_ONLY,
             "atleast": f"{width}x{height}",
+            "ratios": "landscape",  # the rest of the shape check is Candidate.fits
             "page": str(page),
         }
         if self._sorting == "toplist":

@@ -96,9 +96,12 @@ class Store:
         """The image shown most recently."""
         return self._one(f"{_SHOWN} ORDER BY shown_at DESC", ())
 
-    def random_shown(self, exclude: str | None) -> Image | None:
-        """A previously shown image still in the cache, for when nothing new can be fetched."""
-        return self._one(f"{_SHOWN} AND key IS NOT ? ORDER BY random()", (exclude,))
+    def shown_in_random_order(self, exclude: str | None) -> list[Image]:
+        """Previously shown images still in the cache, for when nothing new can be fetched."""
+        rows = self._db.execute(
+            f"SELECT * FROM images WHERE {_SHOWN} AND key IS NOT ? ORDER BY random()", (exclude,)
+        )
+        return [_image(row) for row in rows]
 
     def evictable(self) -> list[Image]:
         """Shown images still in the cache, least recently shown first, never the current one."""
@@ -126,6 +129,10 @@ class Store:
 
     def forget_file(self, key: str) -> None:
         self._update(key, path=None)
+
+    def forget(self, key: str) -> None:
+        """Removes the image entirely, so it can be picked again if it suits later settings."""
+        self._db.execute("DELETE FROM images WHERE key = ?", (key,))
 
     # Candidate lists
 
