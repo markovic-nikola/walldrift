@@ -4,9 +4,9 @@ import contextlib
 import logging
 import os
 import random
-import re
 import time
 from collections.abc import Sequence
+from dataclasses import replace
 from pathlib import Path
 
 from .config import Config
@@ -44,7 +44,12 @@ class Queue:
         self._rng = rng or random.Random()
 
     def pop(self) -> Image | None:
-        """The next image to show: queued if possible, else fetched now, else an old one."""
+        """The next image to show: sometimes a favorite (see favorites_share), otherwise
+        queued if possible, else fetched now, else an old one."""
+        if self._rng.random() < self._config.favorites_share:
+            favorite = self._random_favorite()
+            if favorite is not None:
+                return favorite
         image = self._next_fitting()
         if image is None:
             try:
@@ -57,6 +62,24 @@ class Queue:
             shown = self._store.shown_in_random_order(exclude=current.key if current else None)
             image = next((i for i in shown if self._fits(i)), None)
         return image
+
+    def _random_favorite(self) -> Image | None:
+        """A favorite other than the current wallpaper, with its path set to its copy in the
+        favorites folder, which outlives the cache. Favorites whose copy is gone are skipped."""
+        folder = self._config.favorites_dir
+        if not folder.is_dir():
+            return None
+        copies = {path.stem: path for path in folder.iterdir() if path.is_file()}
+        current = self._store.current()
+        favorites = [
+            image
+            for image in self._store.favorites()
+            if image.candidate.file_stem in copies and not (current and image.key == current.key)
+        ]
+        if not favorites:
+            return None
+        image = self._rng.choice(favorites)
+        return replace(image, path=copies[image.candidate.file_stem])
 
     def _fits(self, image: Image) -> bool:
         return image.candidate.fits(self._config.min_width, self._config.min_height)
@@ -126,7 +149,7 @@ class Queue:
     def _download(self, candidate: Candidate) -> Path:
         self._images_dir.mkdir(parents=True, exist_ok=True)
         # One file per image, so Cinnamon always sees a new path and reloads it.
-        stem = re.sub(r"[^A-Za-z0-9_-]", "_", f"{candidate.source}-{candidate.id}")
+        stem = candidate.file_stem
         # Another backend run may be fetching the same image; each writes its own part file.
         part = self._images_dir / f"{stem}.{os.getpid()}.part"
         try:

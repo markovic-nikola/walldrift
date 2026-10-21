@@ -4,7 +4,7 @@ Random popular wallpapers from online sources, filtered by topics you choose.
 
 walldrift keeps a few images downloaded ahead, so changing the wallpaper is instant and still
 works offline. Favorite the ones you like to keep a copy, or ban the ones you don't to never see
-them again.
+them again. Favorites can come back now and then between new images, as often as you choose.
 
 ## Use
 
@@ -18,8 +18,9 @@ them again.
 Right-click the icon > Configure:
 
 - **General:** how often to change, topics (for example `nature, space, minimal`, or empty for the
-  most popular images overall), minimum resolution (by default your largest monitor's), the
-  favorites folder, and how much to cache.
+  most popular images overall), minimum resolution (by default your largest monitor's), how often
+  to show one of your favorites instead of a new image, the favorites folder, and how much to
+  cache.
 - **Sources:** turn sources on or off, how often each is picked, per-source topics, and
   source-specific filters.
 

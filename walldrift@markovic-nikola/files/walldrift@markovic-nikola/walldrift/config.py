@@ -39,6 +39,8 @@ class Config:
     cache_limit_bytes: int
     queue_size: int
     favorites_dir: Path
+    favorites_share: float
+    """The fraction of changes, 0 to 1, that show a favorite instead of a new image."""
     sources: tuple[SourceConfig, ...]
 
 
@@ -85,6 +87,7 @@ def parse(values: Mapping[str, Any], screen: Screen) -> Config:
         cache_limit_bytes=_positive_int(values["cache-limit-mb"], "cache-limit-mb") * 2**20,
         queue_size=_positive_int(values["queue-size"], "queue-size"),
         favorites_dir=_directory(values["favorites-dir"], "favorites-dir"),
+        favorites_share=_whole_number(values["favorites-share"], "favorites-share", 0, 100) / 100,
         sources=tuple(
             _parse_source(key.removesuffix("-enabled"), values, topics)
             for key in values
@@ -133,11 +136,21 @@ def _typed(value: object, kind: type[T], name: str) -> T:
 
 
 def _positive_int(value: object, name: str) -> int:
+    return _whole_number(value, name, 1)
+
+
+def _whole_number(value: object, name: str, low: int, high: int | None = None) -> int:
     # Cinnamon's spinbuttons may store whole numbers as floats.
     if isinstance(value, float) and value.is_integer():
         value = int(value)
-    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
-        raise ConfigError(f"{name} must be a positive whole number, not {value!r}")
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, int)
+        or value < low
+        or (high is not None and value > high)
+    ):
+        limits = f"from {low} to {high}" if high is not None else f"of at least {low}"
+        raise ConfigError(f"{name} must be a whole number {limits}, not {value!r}")
     return value
 
 

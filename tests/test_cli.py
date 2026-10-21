@@ -84,6 +84,24 @@ def test_fav_copies_and_marks(
     assert (tmp_path / "favs" / Path(answer["image"]["path"]).name).exists()
 
 
+def test_next_mixes_in_favorites(
+    backend: list[Path],
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    settings = {"favorites-dir": str(tmp_path / "favs"), "favorites-share": 100}
+    _, first = run(monkeypatch, capsys, "next", settings)  # no favorites yet: a new image
+    run(monkeypatch, capsys, "fav", settings)
+    run(monkeypatch, capsys, "next", settings)  # the only favorite is current: a new image
+    _, again = run(monkeypatch, capsys, "next", settings)
+    assert again["image"]["id"] == first["image"]["id"]
+    assert backend[-1] == tmp_path / "favs" / Path(first["image"]["path"]).name
+
+    _, info = run(monkeypatch, capsys, "info", settings)
+    assert info["image"]["id"] == first["image"]["id"]
+
+
 def test_ban_moves_on_and_deletes_the_file(
     backend: list[Path], monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:

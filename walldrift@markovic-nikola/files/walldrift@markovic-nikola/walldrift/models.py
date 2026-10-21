@@ -1,3 +1,4 @@
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -25,6 +26,11 @@ class Candidate:
     @property
     def key(self) -> str:
         return f"{self.source}:{self.id}"
+
+    @property
+    def file_stem(self) -> str:
+        """The image's file name without its extension, in the cache and the favorites folder."""
+        return re.sub(r"[^A-Za-z0-9_-]", "_", f"{self.source}-{self.id}")
 
     def fits(self, min_width: int, min_height: int) -> bool:
         """Big enough for the screen, and shaped close enough to it that zooming crops little.

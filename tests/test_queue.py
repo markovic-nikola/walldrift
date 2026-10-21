@@ -111,3 +111,72 @@ def test_pop_drops_queued_images_that_no_longer_fit(store: Store, tmp_path: Path
     assert image is not None and image.key == "fake:id2"
     assert not portrait.exists()
     assert store.known_keys(["fake:id1"]) == set()  # forgotten, not banned
+
+
+def favorite(store: Store, n: int, folder: Path, cached: bool = False) -> Path:
+    """A shown favorite with its copy in the favorites folder, and optionally in the cache."""
+    store.add(candidate(n), folder / "cache" / f"fake-id{n}.jpg", 10)
+    store.mark_shown(f"fake:id{n}")
+    store.set_favorite(f"fake:id{n}")
+    if not cached:
+        store.forget_file(f"fake:id{n}")
+    copy = folder / "favs" / f"fake-id{n}.jpg"
+    copy.parent.mkdir(exist_ok=True)
+    copy.write_bytes(b"x")
+    return copy
+
+
+def test_pop_shows_favorites_from_their_folder(store: Store, tmp_path: Path) -> None:
+    copies = [favorite(store, n, tmp_path) for n in (1, 2)]
+    (tmp_path / "favs" / "fake-id3.jpg").write_bytes(b"x")  # a file that is not a favorite
+    queue, source = make_queue(
+        store,
+        tmp_path / "cache",
+        [[candidate(9)]],
+        settings={"favorites-share": 100, "favorites-dir": str(tmp_path / "favs")},
+    )
+    image = queue.pop()
+    assert image is not None and image.key == "fake:id1"  # never the current one (id2)
+    assert image.path == copies[0]
+    assert source.searches == []
+
+    copies[0].unlink()  # deleting the copy takes it out of the rotation
+    store.mark_shown("fake:id2")
+    image = queue.pop()
+    assert image is not None and image.key == "fake:id9"
+
+
+def test_pop_skips_banned_favorites(store: Store, tmp_path: Path) -> None:
+    favorite(store, 1, tmp_path)
+    favorite(store, 2, tmp_path)
+    store.ban("fake:id1")
+    queue, _ = make_queue(
+        store,
+        tmp_path / "cache",
+        [[candidate(9)]],
+        settings={"favorites-share": 100, "favorites-dir": str(tmp_path / "favs")},
+    )
+    image = queue.pop()
+    assert image is not None and image.key == "fake:id9"
+
+
+def test_favorites_share_mixes_favorites_with_new_images(store: Store, tmp_path: Path) -> None:
+    for n in (1, 2):
+        favorite(store, n, tmp_path)
+    queue, _ = make_queue(
+        store,
+        tmp_path / "cache",
+        [[candidate(n) for n in range(10, 60)]],
+        settings={
+            "favorites-share": 50,
+            "favorites-dir": str(tmp_path / "favs"),
+            "cache-limit-mb": 1000,
+        },
+    )
+    shown = []
+    for _ in range(40):
+        image = queue.pop()
+        assert image is not None
+        store.mark_shown(image.key)
+        shown.append(image.favorite)
+    assert 10 < sum(shown) < 30

@@ -14,6 +14,7 @@ def test_defaults_come_from_the_schema() -> None:
     assert c.queue_size == 3
     assert c.cache_limit_bytes == 1024 * 2**20
     assert c.favorites_dir == Path.home() / "Pictures/Wallpapers"
+    assert c.favorites_share == 0
     [wallhaven] = c.sources
     assert (wallhaven.name, wallhaven.enabled, wallhaven.weight) == ("wallhaven", True, 1.0)
     assert wallhaven.topics == ()
@@ -61,6 +62,10 @@ def test_spinbutton_floats_are_accepted() -> None:
     assert make_config({"queue-size": 4.0}).queue_size == 4
 
 
+def test_favorites_share_is_a_percentage() -> None:
+    assert make_config({"favorites-share": 30.0}).favorites_share == 0.3
+
+
 @pytest.mark.parametrize(
     ("value", "expected"),
     [
@@ -80,6 +85,8 @@ def test_favorites_dir_forms(value: str, expected: Path) -> None:
         {"queue-size": 0},
         {"queue-size": 2.5},
         {"cache-limit-mb": True},
+        {"favorites-share": -10},
+        {"favorites-share": 110},
         {"topics": ["nature"]},
         {"favorites-dir": "relative/path"},
         {"wallhaven-weight": 0},

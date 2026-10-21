@@ -69,3 +69,15 @@ def test_reopening_keeps_data(tmp_path: Path) -> None:
     store.add(candidate(1), Path("/c/1.jpg"), 10)
     store.close()
     assert Store(path).queued_count() == 1
+
+
+def test_a_favorite_stays_current_after_its_cached_file_is_evicted(store: Store) -> None:
+    for n in (1, 2):
+        store.add(candidate(n), Path(f"/c/{n}.jpg"), 10)
+        store.mark_shown(f"fake:id{n}")
+    store.set_favorite("fake:id1")
+    store.forget_file("fake:id1")
+    store.mark_shown("fake:id1")  # shown again from the favorites folder
+    current = store.current()
+    assert current is not None and current.key == "fake:id1" and current.path is None
+    assert [i.key for i in store.favorites()] == ["fake:id1"]

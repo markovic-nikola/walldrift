@@ -10,7 +10,7 @@ Name: `walldrift`. Applet UUID: `walldrift@markovic-nikola`.
 - Rotate the wallpaper at random on a timer, at login, on unlock, and on demand.
 - Get popular images from Wallhaven, with topics set in the applet's settings. Add more sources only where the terms allow a wallpaper app (see Sources).
 - Keep a downloaded queue, so changing the wallpaper is instant and still works offline.
-- Favorite an image (keep a copy) or ban it (never show it again).
+- Favorite an image (keep a copy) or ban it (never show it again). Optionally mix favorites back into the rotation.
 - No dependencies beyond what Mint ships: the Python 3 standard library and PyGObject.
 
 ## Sources
@@ -47,6 +47,7 @@ All settings live in the applet's `settings-schema.json`, and Cinnamon renders t
 | | Change at login / on unlock | switches | on / off |
 | | Topics (comma-separated; empty = top images overall) | entry | empty |
 | | Minimum resolution | combobox: *auto (largest monitor)*, 1920x1080 … 5120x2880 | auto |
+| | Show favorites instead of new images (% of changes; 100 = favorites only, falling back to new images while there are none) | spinbutton | 0 |
 | | Favorites folder | filechooser (folder) | `~/Pictures/Wallpapers` |
 | | Cache limit (MB), images downloaded ahead | spinbuttons | 1024, 3 |
 | Sources | Per source: enabled, weight, topics override (empty = use General) | switch, spinbutton, entry | Wallhaven on |
@@ -140,6 +141,8 @@ Retries, rate limiting, resolution filtering, deduplication, bans, caching and c
 3. Use a cached candidate list if it's fresh; otherwise request a random page from the top results.
 4. Drop candidates that are too small, already shown or banned.
 5. Download one image into the queue.
+
+**Favorites in the rotation.** Before taking from the queue, `next` shows a favorite with the chance set by "Show favorites". It picks at random among favorites that aren't banned or current and whose copy is still in the favorites folder, and shows that copy, so favorites outlive cache trimming. Deleting a copy from the folder takes it out of the rotation.
 
 ## Tech stack
 

@@ -93,8 +93,13 @@ class Store:
         return count
 
     def current(self) -> Image | None:
-        """The image shown most recently."""
-        return self._one(f"{_SHOWN} ORDER BY shown_at DESC", ())
+        """The image shown most recently. It may be a favorite shown from the favorites folder
+        after its cached file was evicted, so its path can be None."""
+        return self._one("shown_at IS NOT NULL AND NOT banned ORDER BY shown_at DESC", ())
+
+    def favorites(self) -> list[Image]:
+        rows = self._db.execute("SELECT * FROM images WHERE favorite AND NOT banned")
+        return [_image(row) for row in rows]
 
     def shown_in_random_order(self, exclude: str | None) -> list[Image]:
         """Previously shown images still in the cache, for when nothing new can be fetched."""

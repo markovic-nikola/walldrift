@@ -20,7 +20,7 @@
         "which-section": {
             "type": "section",
             "title": "Which images",
-            "keys": ["topics", "min-resolution"]
+            "keys": ["topics", "min-resolution", "favorites-share"]
         },
         "storage-section": {
             "type": "section",
@@ -84,13 +84,23 @@
             "5120 × 2880": "5120x2880"
         }
     },
+    "favorites-share": {
+        "type": "spinbutton",
+        "default": 0,
+        "min": 0,
+        "max": 100,
+        "step": 10,
+        "units": "%",
+        "description": "Show favorites instead of new images",
+        "tooltip": "How often a change shows one of your favorites again. 0% shows only new images; 100% shows only favorites. New images are used while you have no favorites."
+    },
 
     "favorites-dir": {
         "type": "filechooser",
         "select-dir": true,
         "default": "~/Pictures/Wallpapers",
         "description": "Favorites folder",
-        "tooltip": "Favorite copies the current wallpaper here."
+        "tooltip": "Favorite copies the current wallpaper here. Favorites are shown again from here, so deleting one from this folder takes it out of the rotation."
     },
     "cache-limit-mb": {
         "type": "spinbutton",
