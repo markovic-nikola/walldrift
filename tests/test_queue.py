@@ -7,7 +7,7 @@ import pytest
 
 from walldrift.errors import HttpError
 from walldrift.models import Candidate
-from walldrift.queue import ORPHAN_AGE, Queue
+from walldrift.queue import ORPHAN_AGE, Queue, is_favorite_turn
 from walldrift.store import Store
 
 from .conftest import FakeHttp, FakeSource, candidate, make_config
@@ -160,7 +160,21 @@ def test_pop_skips_banned_favorites(store: Store, tmp_path: Path) -> None:
     assert image is not None and image.key == "fake:id9"
 
 
-def test_favorites_share_mixes_favorites_with_new_images(store: Store, tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    ("percent", "pattern"),
+    [
+        (0, "nnnnnnnnnn"),
+        (50, "nfnfnfnfnf"),
+        (30, "nnnfnnfnnf"),
+        (100, "ffffffffff"),
+    ],
+)
+def test_favorite_turns_are_spread_evenly(percent: int, pattern: str) -> None:
+    turns = "".join("f" if is_favorite_turn(turn, percent) else "n" for turn in range(10))
+    assert turns == pattern
+
+
+def test_favorites_share_alternates_from_the_first_change(store: Store, tmp_path: Path) -> None:
     for n in (1, 2):
         favorite(store, n, tmp_path)
     queue, _ = make_queue(
@@ -174,9 +188,9 @@ def test_favorites_share_mixes_favorites_with_new_images(store: Store, tmp_path:
         },
     )
     shown = []
-    for _ in range(40):
-        image = queue.pop()
+    for turn in range(6):
+        image = queue.pop(turn)
         assert image is not None
         store.mark_shown(image.key)
         shown.append(image.favorite)
-    assert 10 < sum(shown) < 30
+    assert shown == [False, True] * 3

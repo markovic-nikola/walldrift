@@ -92,7 +92,7 @@
         "step": 10,
         "units": "%",
         "description": "Show favorites instead of new images",
-        "tooltip": "How often a change shows one of your favorites again. 0% shows only new images; 100% shows only favorites. New images are used while you have no favorites."
+        "tooltip": "How often a change shows a random favorite, spread evenly: 50% alternates a new image and a favorite. The first change after login is always new, except at 100%, which shows only favorites. New images are used while you have no favorites."
     },
 
     "favorites-dir": {

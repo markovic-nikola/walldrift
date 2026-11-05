@@ -39,8 +39,8 @@ class Config:
     cache_limit_bytes: int
     queue_size: int
     favorites_dir: Path
-    favorites_share: float
-    """The fraction of changes, 0 to 1, that show a favorite instead of a new image."""
+    favorites_share: int
+    """The percentage of changes that show a favorite instead of a new image."""
     sources: tuple[SourceConfig, ...]
 
 
@@ -87,7 +87,7 @@ def parse(values: Mapping[str, Any], screen: Screen) -> Config:
         cache_limit_bytes=_positive_int(values["cache-limit-mb"], "cache-limit-mb") * 2**20,
         queue_size=_positive_int(values["queue-size"], "queue-size"),
         favorites_dir=_directory(values["favorites-dir"], "favorites-dir"),
-        favorites_share=_whole_number(values["favorites-share"], "favorites-share", 0, 100) / 100,
+        favorites_share=_whole_number(values["favorites-share"], "favorites-share", 0, 100),
         sources=tuple(
             _parse_source(key.removesuffix("-enabled"), values, topics)
             for key in values

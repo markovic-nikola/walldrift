@@ -26,6 +26,15 @@ EXTENSIONS = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}
 ORPHAN_AGE = 60 * 60  # seconds
 
 
+def is_favorite_turn(turn: int, percent: int) -> bool:
+    """Spreads favorites evenly over the changes, counted from 0 since the applet started.
+
+    At 50% they alternate, starting with a new image: new, favorite, new, favorite. At 30%, three
+    changes in every ten show a favorite. Only 100% starts with a favorite.
+    """
+    return (turn + 1) * percent // 100 > turn * percent // 100
+
+
 class Queue:
     def __init__(
         self,
@@ -43,10 +52,10 @@ class Queue:
         self._images_dir = images_dir
         self._rng = rng or random.Random()
 
-    def pop(self) -> Image | None:
-        """The next image to show: sometimes a favorite (see favorites_share), otherwise
-        queued if possible, else fetched now, else an old one."""
-        if self._rng.random() < self._config.favorites_share:
+    def pop(self, turn: int = 0) -> Image | None:
+        """The next image to show: a favorite on favorite turns, otherwise queued if possible,
+        else fetched now, else an old one. turn counts the changes before this one."""
+        if is_favorite_turn(turn, self._config.favorites_share):
             favorite = self._random_favorite()
             if favorite is not None:
                 return favorite

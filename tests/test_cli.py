@@ -35,11 +35,12 @@ def run(
     capsys: pytest.CaptureFixture[str],
     command: str,
     settings: dict[str, Any] | None = None,
+    turn: int = 0,
 ) -> tuple[int, Any]:
     """Runs one command the way the applet does: settings on stdin, one JSON line back."""
     monkeypatch.setattr(protocol, "_sent", False)
     monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps({"queue-size": 2, **(settings or {})})))
-    code = cli.main([command])
+    code = cli.main(["--turn", str(turn), command])
     lines = capsys.readouterr().out.splitlines()
     assert len(lines) == 1, lines
     return code, json.loads(lines[0])
@@ -90,11 +91,14 @@ def test_next_mixes_in_favorites(
     capsys: pytest.CaptureFixture[str],
     tmp_path: Path,
 ) -> None:
-    settings = {"favorites-dir": str(tmp_path / "favs"), "favorites-share": 100}
-    _, first = run(monkeypatch, capsys, "next", settings)  # no favorites yet: a new image
+    settings = {"favorites-dir": str(tmp_path / "favs"), "favorites-share": 50}
+    _, first = run(monkeypatch, capsys, "next", settings, turn=0)  # always new
     run(monkeypatch, capsys, "fav", settings)
-    run(monkeypatch, capsys, "next", settings)  # the only favorite is current: a new image
-    _, again = run(monkeypatch, capsys, "next", settings)
+    # A favorite turn, but the only favorite is current: a new image.
+    _, second = run(monkeypatch, capsys, "next", settings, turn=1)
+    _, third = run(monkeypatch, capsys, "next", settings, turn=2)
+    _, again = run(monkeypatch, capsys, "next", settings, turn=3)
+    assert len({first["image"]["id"], second["image"]["id"], third["image"]["id"]}) == 3
     assert again["image"]["id"] == first["image"]["id"]
     assert backend[-1] == tmp_path / "favs" / Path(first["image"]["path"]).name
 

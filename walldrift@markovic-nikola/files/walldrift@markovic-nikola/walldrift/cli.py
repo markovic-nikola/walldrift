@@ -30,8 +30,9 @@ log = logging.getLogger("walldrift")
 class App:
     """What the commands share, built on first use."""
 
-    def __init__(self, settings_json: str | None) -> None:
+    def __init__(self, settings_json: str | None, turn: int = 0) -> None:
         self._settings_json = settings_json
+        self.turn = turn
 
     @cached_property
     def config(self) -> config.Config:
@@ -87,7 +88,7 @@ class App:
 def cmd_next(app: App) -> None:
     conflicts = setter.conflicts()
     with app.lock("show"):
-        image = app.queue.pop()
+        image = app.queue.pop(app.turn)
         if image is None or image.path is None:
             raise WalldriftError(
                 "No wallpaper available yet: nothing is downloaded and nothing could be fetched. "
@@ -157,6 +158,13 @@ def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="walldrift", description="The walldrift applet's backend.")
     p.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     p.add_argument("-v", "--verbose", action="count", default=0, help="-v progress, -vv debug")
+    p.add_argument(
+        "--turn",
+        type=int,
+        default=0,
+        metavar="N",
+        help="how many changes the applet made before this one; decides when favorites show",
+    )
     commands = p.add_subparsers(dest="command", required=True, metavar="COMMAND")
     for name, (_, help_text) in COMMANDS.items():
         commands.add_parser(name, help=help_text, description=help_text)
@@ -169,7 +177,7 @@ def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=level, format="walldrift: %(message)s")
     settings_json = None if sys.stdin.isatty() else sys.stdin.read()
     try:
-        COMMANDS[args.command][0](App(settings_json))
+        COMMANDS[args.command][0](App(settings_json, args.turn))
     except WalldriftError as e:
         log.error("%s", e)
         return fail(str(e))

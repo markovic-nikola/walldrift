@@ -63,7 +63,7 @@ def test_spinbutton_floats_are_accepted() -> None:
 
 
 def test_favorites_share_is_a_percentage() -> None:
-    assert make_config({"favorites-share": 30.0}).favorites_share == 0.3
+    assert make_config({"favorites-share": 30.0}).favorites_share == 30
 
 
 @pytest.mark.parametrize(

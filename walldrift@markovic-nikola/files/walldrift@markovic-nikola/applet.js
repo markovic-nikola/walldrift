@@ -18,6 +18,7 @@ const UUID = "walldrift@markovic-nikola";
 const PYTHON = "/usr/bin/python3";
 const ICON = "preferences-desktop-wallpaper";
 const TICK_SECONDS = 60;
+const CHANGE_COMMANDS = new Set(["next", "ban"]); // the commands that change the wallpaper
 
 Gettext.bindtextdomain(UUID, GLib.get_home_dir() + "/.local/share/locale");
 
@@ -33,6 +34,7 @@ class WalldriftApplet extends Applet.IconApplet {
         this._busy = false; // a backend command is waiting for its answer
         this._pending = null; // a command asked for while busy or still starting up; runs next
         this._lastAttempt = 0; // when "next" last ran (ms), so a failing change waits a full interval
+        this._changes = 0; // wallpaper changes since the applet started; the backend spaces favorites by it
         this._lastError = null; // don't repeat the same error notification every tick
         this._shownConflicts = new Set(); // warn about each conflict once per session
 
@@ -175,9 +177,9 @@ class WalldriftApplet extends Applet.IconApplet {
             });
             launcher.set_cwd(this._dir);
             // -B: never write __pycache__ into the applet folder.
-            proc = launcher.spawnv([PYTHON, "-B", "-m", "walldrift", command]);
+            proc = launcher.spawnv([PYTHON, "-B", "-m", "walldrift", "--turn", String(this._changes), command]);
         } catch (e) {
-            this._onAnswer({ error: _("Could not start %s: %s").format(PYTHON, e.message) });
+            this._onAnswer(command, { error: _("Could not start %s: %s").format(PYTHON, e.message) });
             return;
         }
 
@@ -209,17 +211,18 @@ class WalldriftApplet extends Applet.IconApplet {
             if (!answer || typeof answer !== "object") {
                 answer = { error: _("The walldrift backend stopped unexpectedly. Details are in ~/.xsession-errors.") };
             }
-            this._onAnswer(answer);
+            this._onAnswer(command, answer);
         });
     }
 
-    _onAnswer(answer) {
+    _onAnswer(command, answer) {
         this._busy = false;
         if (answer.error) {
             if (answer.error !== this._lastError) this._notify(answer.error);
             this._lastError = answer.error;
         } else {
             this._lastError = null;
+            if (CHANGE_COMMANDS.has(command)) this._changes++;
             this._image = answer.image;
             for (const conflict of answer.conflicts || []) this._warnConflict(conflict);
         }

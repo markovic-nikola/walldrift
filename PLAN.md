@@ -47,7 +47,7 @@ All settings live in the applet's `settings-schema.json`, and Cinnamon renders t
 | | Change at login / on unlock | switches | on / off |
 | | Topics (comma-separated; empty = top images overall) | entry | empty |
 | | Minimum resolution | combobox: *auto (largest monitor)*, 1920x1080 … 5120x2880 | auto |
-| | Show favorites instead of new images (% of changes; 100 = favorites only, falling back to new images while there are none) | spinbutton | 0 |
+| | Show favorites instead of new images (% of changes, spread evenly; 50 alternates; 100 = favorites only, falling back to new images while there are none) | spinbutton | 0 |
 | | Favorites folder | filechooser (folder) | `~/Pictures/Wallpapers` |
 | | Cache limit (MB), images downloaded ahead | spinbuttons | 1024, 3 |
 | Sources | Per source: enabled, weight, topics override (empty = use General) | switch, spinbutton, entry | Wallhaven on |
@@ -142,7 +142,7 @@ Retries, rate limiting, resolution filtering, deduplication, bans, caching and c
 4. Drop candidates that are too small, already shown or banned.
 5. Download one image into the queue.
 
-**Favorites in the rotation.** Before taking from the queue, `next` shows a favorite with the chance set by "Show favorites". It picks at random among favorites that aren't banned or current and whose copy is still in the favorites folder, and shows that copy, so favorites outlive cache trimming. Deleting a copy from the folder takes it out of the rotation.
+**Favorites in the rotation.** The applet counts its changes since it started and passes the count as `--turn`. From that, `next` shows a favorite on an evenly spread share of turns set by "Show favorites", the first change of a session always being new: at 50% that's new, favorite, new, favorite. It picks at random among favorites that aren't banned or current and whose copy is still in the favorites folder, and shows that copy, so favorites outlive cache trimming. Deleting a copy from the folder takes it out of the rotation.
 
 ## Tech stack
 
